@@ -132,11 +132,11 @@ var _ = BeforeSuite(func() {
 				"ads":       config.NewBytesSources(heiseFile.Path),
 				"allowlist": config.NewBytesSources(heiseFile.Path),
 			},
-			ClientGroupsBlock: map[string][]string{
-				"default":         {"ads"},
-				"clAllowlistOnly": {"allowlist"},
-				"clAdsAndYoutube": {"ads", "youtube"},
-				"clYoutubeOnly":   {"youtube"},
+			ClientGroupsBlock: map[string][]config.BlockItem{
+				"default":         {{Name: "ads"}},
+				"clAllowlistOnly": {{Name: "allowlist"}},
+				"clAdsAndYoutube": {{Name: "ads"}, {Name: "youtube"}},
+				"clYoutubeOnly":   {{Name: "youtube"}},
 			},
 			BlockType: "zeroIp",
 			BlockTTL:  config.Duration(6 * time.Hour),

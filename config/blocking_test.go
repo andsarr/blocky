@@ -20,8 +20,8 @@ var _ = Describe("BlockingConfig", func() {
 			Denylists: map[string][]BytesSource{
 				"gr1": NewBytesSources("/a/file/path"),
 			},
-			ClientGroupsBlock: map[string][]string{
-				"default": {"gr1"},
+			ClientGroupsBlock: map[string][]BlockItem{
+				"default": {{Name: "gr1"}},
 			},
 		}
 	})

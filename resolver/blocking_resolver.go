@@ -90,16 +90,16 @@ type BlockingResolver struct {
 	blockHandler        blockHandler
 	allowlistOnlyGroups map[string]bool
 	status              *status
-	clientGroupsBlock   map[string][]string
+	clientGroupsBlock   map[string][]config.BlockItem
 	redisClient         *redis.Client
 	fqdnIPCache         expirationcache.ExpiringCache[[]net.IP]
 }
 
-func clientGroupsBlock(cfg config.Blocking) map[string][]string {
-	cgb := make(map[string][]string, len(cfg.ClientGroupsBlock))
+func clientGroupsBlock(cfg config.Blocking) map[string][]config.BlockItem {
+	cgb := make(map[string][]config.BlockItem, len(cfg.ClientGroupsBlock))
 
 	for identifier, cfgGroups := range cfg.ClientGroupsBlock {
-		for _, ipart := range strings.Split(strings.ToLower(identifier), ",") {
+		for ipart := range strings.SplitSeq(strings.ToLower(identifier), ",") {
 			existingGroups, found := cgb[ipart]
 			if found {
 				cgb[ipart] = append(existingGroups, cfgGroups...)
@@ -398,7 +398,7 @@ func (r *BlockingResolver) handleDenylist(ctx context.Context, groupsToCheck []s
 // Resolve checks the query against the denylist and delegates to next resolver if domain is not blocked
 func (r *BlockingResolver) Resolve(ctx context.Context, request *model.Request) (*model.Response, error) {
 	ctx, logger := r.log(ctx)
-	groupsToCheck := r.groupsToCheckForClient(request)
+	groupsToCheck := r.groupsToCheckForClient(request, logger)
 
 	if len(groupsToCheck) > 0 {
 		handled, resp, err := r.handleDenylist(ctx, groupsToCheck, request, logger)
@@ -444,25 +444,23 @@ func extractEntryToCheckFromResponse(rr dns.RR) (entryToCheck, tName string) {
 	return
 }
 
-func (r *BlockingResolver) isGroupDisabled(group string) bool {
+func (r *BlockingResolver) isGroupDisabled(group config.BlockItem) bool {
 	r.status.lock.RLock()
 	defer r.status.lock.RUnlock()
 
-	for _, g := range r.status.disabledGroups {
-		if g == group {
-			return true
-		}
+	if slices.Contains(r.status.disabledGroups, group.Name) {
+		return true
 	}
 
-	return false
+	return !group.Schedule.AlwaysActive() && !group.Schedule.IsActive()
 }
 
 // returns groups which should be checked for client's request
-func (r *BlockingResolver) groupsToCheckForClient(request *model.Request) []string {
+func (r *BlockingResolver) groupsToCheckForClient(request *model.Request, log *logrus.Entry) []string {
 	r.status.lock.RLock()
 	defer r.status.lock.RUnlock()
 
-	var groups []string
+	var groups []config.BlockItem
 	// try client names
 	for _, cName := range request.ClientNames {
 		for blockGroup, groupsByName := range r.clientGroupsBlock {
@@ -504,7 +502,10 @@ func (r *BlockingResolver) groupsToCheckForClient(request *model.Request) []stri
 
 	for _, g := range groups {
 		if !r.isGroupDisabled(g) {
-			result = append(result, g)
+			log.Info("Adding group " + g.Name + " to groups to check")
+			result = append(result, g.Name)
+		} else {
+			log.Info("Skipping group " + g.Name + " for the current user")
 		}
 	}
 
