@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/0xERR0R/blocky/log"
 
@@ -218,4 +219,8 @@ func ClientNameMatchesGroupName(group, clientName string) bool {
 	match, _ := filepath.Match(strings.ToLower(group), strings.ToLower(clientName))
 
 	return match
+}
+
+func StripDate(t time.Time) time.Time {
+	return time.Date(0, 1, 1, t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
 }
